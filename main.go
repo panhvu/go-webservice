@@ -163,6 +163,8 @@ func findProductByID(productID int) (*Product, int) {
 
 // contains code which runs before/after the request is processed and http is served back to client
 // -> useful f.e. authentication/disk saving etc., anything which shall be executed for multiple (every) API requests
+// TODO: add CORS (cross origin resource sharing), which enables requests from different origins (ports f.e.) to go through
+// => used to make it work with demo angular client app
 func middlewareHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// do stuff before
