@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 type Product struct {
@@ -30,6 +32,15 @@ func init() {
 			"pricePerUnit": "43.98",
 			"quantityOnHand": 2040,
 			"productName": "Product"
+		},
+		{
+			"productId": 2,
+			"manufacturer": "Jimmy-Jones",
+			"sku": "2915559",
+			"upc": "95846930",
+			"pricePerUnit": "993.98",
+			"quantityOnHand": 3204,
+			"productName": "Hammer"
 		}
 	]`
 	err := json.Unmarshal([]byte(productsJson), &productList)
@@ -38,11 +49,60 @@ func init() {
 	}
 }
 
+func productHandler(w http.ResponseWriter, r *http.Request) {
+	// getting ID by simple string parsing
+	urlPathSegments := strings.Split(r.URL.Path, "products/")
+	productID, err := strconv.Atoi(urlPathSegments[len(urlPathSegments)-1]) //convert string to int
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	product, listItemIndex := findProductByID(productID)
+	if product == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		// return a single product
+		productJSON, err := json.Marshal(product)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(productJSON)
+	case http.MethodPut:
+		// update existing product in list
+		var updatedProduct Product
+		bodyBytes, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		err = json.Unmarshal(bodyBytes, &updatedProduct)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// sanity check if IDs in body and url match
+		if updatedProduct.ProductID != productID {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		product = &updatedProduct
+		productList[listItemIndex] = *product
+		w.WriteHeader(http.StatusOK)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
 func productsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		handleGetRequest(w)
-
 	case http.MethodPost:
 		handlePostRequest(w, r)
 	}
@@ -92,7 +152,17 @@ func getNextID() int {
 	return highestID + 1
 }
 
+func findProductByID(productID int) (*Product, int) {
+	for i, product := range productList {
+		if product.ProductID == productID {
+			return &product, i
+		}
+	}
+	return nil, 0
+}
+
 func main() {
 	http.HandleFunc("/products", productsHandler)
+	http.HandleFunc("/products/", productHandler)
 	http.ListenAndServe(":5000", nil)
 }
