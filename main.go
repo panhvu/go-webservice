@@ -161,8 +161,21 @@ func findProductByID(productID int) (*Product, int) {
 	return nil, 0
 }
 
+// contains code which runs before/after the request is processed and http is served back to client
+// -> useful f.e. authentication/disk saving etc., anything which shall be executed for multiple (every) API requests
+func middlewareHandler(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// do stuff before
+		handler.ServeHTTP(w, r)
+		// do stuff after
+	})
+}
+
 func main() {
-	http.HandleFunc("/products", productsHandler)
-	http.HandleFunc("/products/", productHandler)
+	productListHandler := http.HandlerFunc(productsHandler)
+	productItemHandler := http.HandlerFunc(productHandler)
+
+	http.Handle("/products", middlewareHandler(productListHandler))
+	http.Handle("/products/", middlewareHandler(productItemHandler))
 	http.ListenAndServe(":5000", nil)
 }
